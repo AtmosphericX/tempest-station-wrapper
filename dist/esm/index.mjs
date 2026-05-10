@@ -43,14 +43,12 @@ import * as fs from "fs";
 import * as path from "path";
 import * as events from "events";
 import * as jobs from "croner";
-import axios from "axios";
 import ws from "ws";
 var packages = {
   fs,
   path,
   events,
   jobs,
-  axios,
   crypto,
   ws
 };
@@ -153,13 +151,19 @@ var Utils = class {
         headers: __spreadValues(__spreadValues({}, defaultOptions.headers), (_a = options == null ? void 0 : options.headers) != null ? _a : {})
       });
       try {
-        const resp = yield packages.axios.get(url, {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), requestOptions.timeout);
+        const resp = yield fetch(url, {
           headers: requestOptions.headers,
-          timeout: requestOptions.timeout,
-          maxRedirects: 0,
-          validateStatus: (status) => status === 200 || status === 500
+          signal: controller.signal,
+          redirect: "manual"
         });
-        return { error: false, message: resp.data };
+        clearTimeout(timeoutId);
+        if (resp.status !== 200 && resp.status !== 500) {
+          throw new Error(`HTTP Error: ${resp.status}`);
+        }
+        const data = yield resp.json();
+        return { error: false, message: data };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         return { error: true, message: msg };

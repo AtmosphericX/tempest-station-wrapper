@@ -16,7 +16,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as events from 'events';
 import * as jobs from 'croner';
-import axios from 'axios';
 import ws from 'ws';
 
 export const packages = {
@@ -24,7 +23,6 @@ export const packages = {
     path, 
     events, 
     jobs, 
-    axios, 
     crypto, 
     ws
 };

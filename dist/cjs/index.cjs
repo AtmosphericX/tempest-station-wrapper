@@ -76,14 +76,12 @@ var fs = __toESM(require("fs"));
 var path = __toESM(require("path"));
 var events = __toESM(require("events"));
 var jobs = __toESM(require("croner"));
-var import_axios = __toESM(require("axios"));
 var import_ws = __toESM(require("ws"));
 var packages = {
   fs,
   path,
   events,
   jobs,
-  axios: import_axios.default,
   crypto,
   ws: import_ws.default
 };
@@ -186,13 +184,19 @@ var Utils = class {
         headers: __spreadValues(__spreadValues({}, defaultOptions.headers), (_a = options == null ? void 0 : options.headers) != null ? _a : {})
       });
       try {
-        const resp = yield packages.axios.get(url, {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), requestOptions.timeout);
+        const resp = yield fetch(url, {
           headers: requestOptions.headers,
-          timeout: requestOptions.timeout,
-          maxRedirects: 0,
-          validateStatus: (status) => status === 200 || status === 500
+          signal: controller.signal,
+          redirect: "manual"
         });
-        return { error: false, message: resp.data };
+        clearTimeout(timeoutId);
+        if (resp.status !== 200 && resp.status !== 500) {
+          throw new Error(`HTTP Error: ${resp.status}`);
+        }
+        const data = yield resp.json();
+        return { error: false, message: data };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         return { error: true, message: msg };
