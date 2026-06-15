@@ -19,10 +19,12 @@
 
 
 import { TypeSettings } from "../../@types/types.settings";
-import { setEventEmit } from "../@utilities/utilities.setEventEmit";
 import { bootstrap } from "../../bootstrap";
-import ws from 'ws'
 import { createHttp } from "../@utilities/utilities.createHttp";
+import { xReconnect } from "./connection.xReconnect";
+import { setEventEmit } from "../@utilities/utilities.setEventEmit";
+import ws from 'ws'
+
 
 
 export const xDeploy = async (): Promise<void> => {
@@ -38,24 +40,24 @@ export const xDeploy = async (): Promise<void> => {
             },
             message: `Invalid settings provided, please make sure you have provided valid APIKey, DeviceID, and StationID.`
         });
-        return; 
+        await xReconnect(`Invalid settings provided, please make sure you have provided valid APIKey, DeviceID, and StationID.`);
     }
     bootstrap.socket = new ws(bootstrap.cache.socket.replace('{KEY}', settings.APIKey).replace('{DEVICE}', settings.DeviceID.toString()));
     bootstrap.socket.on('open', async () => {
         setEventEmit({
             event: `onTempestStation`,
             metadata: {
-                message: `WebSocket connection established.`,
+                message: `WebSocket connection established (@${settings.DeviceID}/${settings.StationID})`,
                 data: {},
                 type: `online`,
                 error: false
             },
-            message: `WebSocket connection established.`
+            message: `WebSocket connection established (@${settings.DeviceID}/${settings.StationID})`
         });
 
         if (settings?.StationID) {
             const station = await createHttp({
-                url: bootstrap.cache.stations.replace('{STATION}', String(settings.StationID)).replace('{KEY}', settings.APIKey),
+                url: bootstrap.cache.station.replace('{STATION}', String(settings.StationID)).replace('{KEY}', settings.APIKey),
                 headers: {
                     "User-Agent": "@atmosx/tempest-station-wrapper",
                     "Accept": "application/geo+json, text/plain, */*; q=0.9",
@@ -63,7 +65,7 @@ export const xDeploy = async (): Promise<void> => {
                 }
             })
             if (!station.error) { 
-                const data = station.message;
+                const data = JSON.parse(station.message);
                 const s1 = data.stations?.[0];
                 bootstrap.cache.longitude = Number(s1?.longitude);
                 bootstrap.cache.latitude = Number(s1?.latitude);

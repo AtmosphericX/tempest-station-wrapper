@@ -17,19 +17,33 @@
 
 */
 
-
-import { TypeSettings } from "../../@types/types.settings";
 import { bootstrap } from "../../bootstrap";
+import { setEventEmit } from "../@utilities/utilities.setEventEmit";
 import { xDeploy } from "./connection.xDeploy";
 
-
-
 export const xReconnect = (reason: string): Promise<void> => {
+    if (!bootstrap.socket) return;
     if (bootstrap.reconnect) return;
     if (String(reason).includes(`429`)) { 
         bootstrap.delay = Math.min(bootstrap.delay * 2, 60e3);
     }
     bootstrap.reconnect = setTimeout(async () => {
+        setEventEmit({
+            event: `onTempestStation`,
+            metadata: {
+                message: `Websocket Reconnecting...`,
+                data: {},
+                type: `reconnect`,
+                error: false 
+            },
+            message: `Websocket reconnecting...`
+        });
+        if (bootstrap.socket) { 
+            bootstrap.socket.close(); 
+        }
+        bootstrap.socket = null;
+        bootstrap.reconnect = null;
+        bootstrap.connecting = false;
         bootstrap.reconnect = null;
         await xDeploy();
     }, bootstrap.delay);

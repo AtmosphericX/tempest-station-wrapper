@@ -17,18 +17,34 @@
 
 */
 
-import { bootstrap } from "../../bootstrap"
-import { TypeSettings } from "../../@types/types.settings";
+import { setEventEmit } from '../@modules/@utilities/utilities.setEventEmit'
+import { bootstrap } from '../bootstrap';
 
-interface SetWarningOptions { 
-    title?: string
-    message: string
+
+
+interface LightningOptions {
+    serial_number: string
+    type: string
+    hub_sn: string
+    evt: [number, number, number, number]
+    source: string
+    device_id: number
 }
 
-export const setWarning = (options: SetWarningOptions): void => {
-    const settings = bootstrap.settings as TypeSettings;
-    bootstrap.listener.emit(`log`, `${options.title ?? `[${bootstrap.ansi_colors.YELLOW}@atmosx/tempest-station${bootstrap.ansi_colors.RESET}]`} ${options.message}`)
-    if (settings.EnableJournal) { 
-        console.log(`${options.title ?? `[${bootstrap.ansi_colors.YELLOW}@atmosx/tempest-station${bootstrap.ansi_colors.RESET}]`} ${options.message}`)
-    }
+export const lightning = (data: LightningOptions): void => {
+    setEventEmit({
+        event: `onObservedLightning`,
+        metadata: {
+            type: `Feature`,
+            geometry: {
+                type: `Point`,
+                coordinates: [bootstrap.cache.longitude, bootstrap.cache.latitude]
+            },
+            properties: {
+                time: data.evt?.[0],
+                distance: parseFloat((data.evt?.[1] / 0.621371).toFixed(2)),
+                energy: data.evt?.[2],
+            }
+        },
+    });
 }

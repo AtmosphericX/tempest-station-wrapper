@@ -21,8 +21,11 @@
 import { TypeSettings } from "./@types/types.settings";
 import { setEventEmit } from "./@modules/@utilities/utilities.setEventEmit";
 import { startService } from "./@core/core.start"
+import { stopService } from "./@core/core.stop"
+import { getClosestStation } from "./@core/core.getNearestStation";
 import { createListener } from "./@core/core.createListener";
 import { setWarning } from "./@modules/@utilities/utilities.setWarning";
+
 
 export class Manager { 
     constructor(settings: TypeSettings) { this.trycatch(); startService(settings) }
@@ -50,3 +53,10 @@ export class Manager {
         })
     }
 }
+
+
+export default Manager
+export { 
+    startService, stopService, getClosestStation
+}
+

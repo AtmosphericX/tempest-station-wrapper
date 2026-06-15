@@ -1,3 +1,22 @@
+var __defProp = Object.defineProperty;
+var __defProps = Object.defineProperties;
+var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
+var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __propIsEnum = Object.prototype.propertyIsEnumerable;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __spreadValues = (a, b) => {
+  for (var prop in b || (b = {}))
+    if (__hasOwnProp.call(b, prop))
+      __defNormalProp(a, prop, b[prop]);
+  if (__getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(b)) {
+      if (__propIsEnum.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    }
+  return a;
+};
+var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {
     var fulfilled = (value) => {
@@ -43,7 +62,9 @@ var bootstrap = {
     longitude: null,
     latitude: null,
     socket: `wss://ws.weatherflow.com/swd/data?api_key={KEY}&location_id={DEVICE}&ver=tempest-20250728`,
-    stations: `https://swd.weatherflow.com/swd/rest/stations/{STATION}?api_key={KEY}`,
+    station: `https://swd.weatherflow.com/swd/rest/stations/{STATION}?api_key={KEY}`,
+    stations: `https://swd.weatherflow.com/swd/rest/map/stations?api_key={KEY}&build=160&limit=500&lat_min={LMIN}&lon_min={LOMIN}&lat_max={LMAX}&lon_max={LOMAX}&_={TIME}`,
+    forecast: `https://swd.weatherflow.com/swd/rest/better_forecast?api_key={KEY}&station_id={STATION}&units_temp=f&units_wind=mph&units_pressure=inhg&units_distance=mi&units_precip=in&units_other=imperial&units_direction=mph`,
     directions: {
       N: [348.75, 360],
       NNE: [11.25, 33.75],
@@ -101,9 +122,9 @@ var setTimeoutAction = (options) => {
 var setWarning = (options) => {
   var _a, _b;
   const settings = bootstrap.settings;
-  bootstrap.listener.emit(`log`, `${(_a = options.title) != null ? _a : `[${bootstrap.ansi_colors.YELLOW}ATMOSX-PARSER${bootstrap.ansi_colors.RESET}]`} ${options.message}`);
+  bootstrap.listener.emit(`log`, `${(_a = options.title) != null ? _a : `[${bootstrap.ansi_colors.YELLOW}@atmosx/tempest-station${bootstrap.ansi_colors.RESET}]`} ${options.message}`);
   if (settings.EnableJournal) {
-    console.log(`${(_b = options.title) != null ? _b : `[${bootstrap.ansi_colors.YELLOW}ATMOSX-PARSER${bootstrap.ansi_colors.RESET}]`} ${options.message}`);
+    console.log(`${(_b = options.title) != null ? _b : `[${bootstrap.ansi_colors.YELLOW}@atmosx/tempest-station${bootstrap.ansi_colors.RESET}]`} ${options.message}`);
   }
 };
 
@@ -143,9 +164,6 @@ var setSettings = (newSettings) => {
   merge(settings, newSettings);
   return settings;
 };
-
-// src/@modules/@connection/connection.xDeploy.ts
-import ws from "ws";
 
 // src/@modules/@utilities/utilities.createHttp.ts
 import request from "request";
@@ -205,7 +223,37 @@ var createHttp = (options) => __async(null, null, function* () {
   });
 });
 
+// src/@modules/@connection/connection.xReconnect.ts
+var xReconnect = (reason) => {
+  if (!bootstrap.socket) return;
+  if (bootstrap.reconnect) return;
+  if (String(reason).includes(`429`)) {
+    bootstrap.delay = Math.min(bootstrap.delay * 2, 6e4);
+  }
+  bootstrap.reconnect = setTimeout(() => __async(null, null, function* () {
+    setEventEmit({
+      event: `onTempestStation`,
+      metadata: {
+        message: `Websocket Reconnecting...`,
+        data: {},
+        type: `reconnect`,
+        error: false
+      },
+      message: `Websocket reconnecting...`
+    });
+    if (bootstrap.socket) {
+      bootstrap.socket.close();
+    }
+    bootstrap.socket = null;
+    bootstrap.reconnect = null;
+    bootstrap.connecting = false;
+    bootstrap.reconnect = null;
+    yield xDeploy();
+  }), bootstrap.delay);
+};
+
 // src/@modules/@connection/connection.xDeploy.ts
+import ws from "ws";
 var xDeploy = () => __async(null, null, function* () {
   const settings = bootstrap.settings;
   if (!(settings == null ? void 0 : settings.APIKey) || !(settings == null ? void 0 : settings.DeviceID) || (settings == null ? void 0 : settings.DeviceID) == 0 && (settings == null ? void 0 : settings.StationID) == 0) {
@@ -219,7 +267,7 @@ var xDeploy = () => __async(null, null, function* () {
       },
       message: `Invalid settings provided, please make sure you have provided valid APIKey, DeviceID, and StationID.`
     });
-    return;
+    yield xReconnect(`Invalid settings provided, please make sure you have provided valid APIKey, DeviceID, and StationID.`);
   }
   bootstrap.socket = new ws(bootstrap.cache.socket.replace("{KEY}", settings.APIKey).replace("{DEVICE}", settings.DeviceID.toString()));
   bootstrap.socket.on("open", () => __async(null, null, function* () {
@@ -227,16 +275,16 @@ var xDeploy = () => __async(null, null, function* () {
     setEventEmit({
       event: `onTempestStation`,
       metadata: {
-        message: `WebSocket connection established.`,
+        message: `WebSocket connection established (@${settings.DeviceID}/${settings.StationID})`,
         data: {},
         type: `online`,
         error: false
       },
-      message: `WebSocket connection established.`
+      message: `WebSocket connection established (@${settings.DeviceID}/${settings.StationID})`
     });
     if (settings == null ? void 0 : settings.StationID) {
       const station = yield createHttp({
-        url: bootstrap.cache.stations.replace("{STATION}", String(settings.StationID)).replace("{KEY}", settings.APIKey),
+        url: bootstrap.cache.station.replace("{STATION}", String(settings.StationID)).replace("{KEY}", settings.APIKey),
         headers: {
           "User-Agent": "@atmosx/tempest-station-wrapper",
           "Accept": "application/geo+json, text/plain, */*; q=0.9",
@@ -244,7 +292,7 @@ var xDeploy = () => __async(null, null, function* () {
         }
       });
       if (!station.error) {
-        const data = station.message;
+        const data = JSON.parse(station.message);
         const s1 = (_a = data.stations) == null ? void 0 : _a[0];
         bootstrap.cache.longitude = Number(s1 == null ? void 0 : s1.longitude);
         bootstrap.cache.latitude = Number(s1 == null ? void 0 : s1.latitude);
@@ -272,20 +320,9 @@ var xDeploy = () => __async(null, null, function* () {
   }));
 });
 
-// src/@modules/@connection/connection.xReconnect.ts
-var xReconnect = (reason) => {
-  if (bootstrap.reconnect) return;
-  if (String(reason).includes(`429`)) {
-    bootstrap.delay = Math.min(bootstrap.delay * 2, 6e4);
-  }
-  bootstrap.reconnect = setTimeout(() => __async(null, null, function* () {
-    bootstrap.reconnect = null;
-    yield xDeploy();
-  }), bootstrap.delay);
-};
-
 // src/@modules/@connection/connection.xError.ts
 var xError = () => __async(null, null, function* () {
+  if (!bootstrap.socket) return;
   bootstrap.socket.on("error", (error) => {
     setEventEmit({
       event: `onTempestStation`,
@@ -297,7 +334,9 @@ var xError = () => __async(null, null, function* () {
       },
       message: `WebSocket closed unexpectedly, Attemtping to reconnect...`
     });
-    bootstrap.socket.close();
+    if (bootstrap.socket) {
+      bootstrap.socket.close();
+    }
     bootstrap.socket = null;
     bootstrap.reconnect = null;
     bootstrap.connecting = false;
@@ -305,26 +344,127 @@ var xError = () => __async(null, null, function* () {
   });
 });
 
+// src/@events/events.wind.ts
+var wind = (data) => {
+  var _a, _b;
+  setEventEmit({
+    event: `onObservedWind`,
+    metadata: {
+      type: `Feature`,
+      geometry: {
+        type: `Point`,
+        coordinates: [bootstrap.cache.longitude, bootstrap.cache.latitude]
+      },
+      properties: {
+        device_id: data.device_id,
+        serial_number: data.serial_number,
+        hub_sn: data.hub_sn,
+        time: (_a = data.ob) == null ? void 0 : _a[0],
+        wind: (_b = data.ob) == null ? void 0 : _b[1],
+        direction: bootstrap.cache.directions ? Object.keys(bootstrap.cache.directions).find((key) => {
+          var _a2, _b2;
+          const [min, max] = bootstrap.cache.directions[key];
+          return min <= ((_a2 = data.ob) == null ? void 0 : _a2[2]) && ((_b2 = data.ob) == null ? void 0 : _b2[2]) < max;
+        }) : void 0
+      }
+    }
+  });
+};
+
+// src/@events/events.observations.ts
+var observations = (data) => {
+  setEventEmit({
+    event: `onObservation`,
+    metadata: {
+      type: `Feature`,
+      geometry: {
+        type: `Point`,
+        coordinates: [bootstrap.cache.longitude, bootstrap.cache.latitude]
+      },
+      properties: __spreadProps(__spreadValues({}, data.summary), {
+        observation: {
+          time: data.obs[0][0],
+          wind_average: parseFloat((data.obs[0][2] * 2.23694).toFixed(2)),
+          wind: parseFloat((data.obs[0][3] * 2.23694).toFixed(2)),
+          direction: bootstrap.cache.directions ? Object.keys(bootstrap.cache.directions).find((dir) => {
+            const [min, max] = bootstrap.cache.directions[dir];
+            return data.obs[0][4] >= min && data.obs[0][4] < max;
+          }) : data.obs[0][4],
+          temperature: parseFloat((data.obs[0][7] * 9 / 5 + 32).toFixed(2)),
+          humidity: data.obs[0][8]
+        }
+      })
+    }
+  });
+};
+
+// src/@events/events.lightning.ts
+var lightning = (data) => {
+  var _a, _b, _c;
+  setEventEmit({
+    event: `onObservedLightning`,
+    metadata: {
+      type: `Feature`,
+      geometry: {
+        type: `Point`,
+        coordinates: [bootstrap.cache.longitude, bootstrap.cache.latitude]
+      },
+      properties: {
+        time: (_a = data.evt) == null ? void 0 : _a[0],
+        distance: parseFloat((((_b = data.evt) == null ? void 0 : _b[1]) / 0.621371).toFixed(2)),
+        energy: (_c = data.evt) == null ? void 0 : _c[2]
+      }
+    }
+  });
+};
+
+// src/@events/events.forecast.ts
+var forecast = (data) => {
+  setEventEmit({
+    event: `onForecast`,
+    metadata: {
+      type: `Feature`,
+      geometry: {
+        type: `Point`,
+        coordinates: [bootstrap.cache.longitude, bootstrap.cache.latitude]
+      },
+      properties: __spreadProps(__spreadValues({}, data.current_conditions), {
+        station: data.location_name,
+        elevation: data.station.elevation
+      })
+    }
+  });
+};
+
 // src/@modules/@connection/connection.xMessages.ts
 var xMessages = () => __async(null, null, function* () {
-  bootstrap.socket.on("message", (message) => {
+  if (!bootstrap.socket) return;
+  bootstrap.socket.on("message", (message) => __async(null, null, function* () {
     const data = JSON.parse(message.toString());
     switch (data.type) {
-      case `ack`:
-        console.log(`ACK: ${JSON.stringify(data)}`);
-        break;
       case `obs_st`:
-        console.log(`Observation: ${JSON.stringify(data)}`);
+        observations(data);
+        const response = yield createHttp({
+          url: bootstrap.cache.forecast.replace("{KEY}", bootstrap.settings.APIKey).replace("{STATION}", bootstrap.settings.StationID),
+          headers: {
+            "User-Agent": "@atmosx/tempest-station-wrapper",
+            "Accept": "application/geo+json, text/plain, */*; q=0.9",
+            "Accept-Language": "en-US,en;q=0.9"
+          }
+        });
+        if (!response.error) {
+          forecast(JSON.parse(response.message));
+        }
         break;
       case `rapid_wind`:
-        console.log(`Rapid Wind: ${JSON.stringify(data)}`);
+        wind(data);
         break;
       case `evt_strike`:
-        console.log(`Event Strike: ${JSON.stringify(data)}`);
+        lightning(data);
         break;
       default:
     }
-  });
+  }));
 });
 
 // src/@core/core.start.ts
@@ -335,6 +475,68 @@ var startService = (configurations) => __async(null, null, function* () {
   yield xDeploy();
   yield xError();
   yield xMessages();
+});
+
+// src/@core/core.stop.ts
+var stopService = () => __async(null, null, function* () {
+  if (bootstrap.socket) {
+    bootstrap.socket.close();
+  }
+  bootstrap.socket = null;
+  bootstrap.reconnect = null;
+  bootstrap.connecting = false;
+  bootstrap.reconnect = null;
+});
+
+// src/@core/core.getNearestStation.ts
+var getClosestStation = (options) => __async(null, null, function* () {
+  if (!Number.isFinite(options.latitude) || !Number.isFinite(options.longitude)) {
+    setWarning({ message: `Invalid latitude or longitude provided.` });
+  }
+  console.log(bootstrap.cache.stations.replace("{KEY}", bootstrap.settings.APIKey).replace("{LMIN}", String(options.latitude - 5)).replace("{LOMIN}", String(options.longitude - 5)).replace("{LMAX}", String(options.latitude + 5)).replace("{LOMAX}", String(options.longitude + 5)).replace("{TIME}", String(Date.now())));
+  const response = yield createHttp({
+    url: bootstrap.cache.stations.replace("{KEY}", bootstrap.settings.APIKey).replace("{LMIN}", String(options.latitude - 5)).replace("{LOMIN}", String(options.longitude - 5)).replace("{LMAX}", String(options.latitude + 5)).replace("{LOMAX}", String(options.longitude + 5)).replace("{TIME}", String(Date.now())),
+    headers: {
+      "User-Agent": "@atmosx/tempest-station-wrapper",
+      "Accept": "application/geo+json, text/plain, */*; q=0.9",
+      "Accept-Language": "en-US,en;q=0.9"
+    }
+  });
+  if (!response.error) {
+    const data = JSON.parse(response.message);
+    const features = Array.isArray(data == null ? void 0 : data.features) ? data.features : [];
+    const toRad = (degrees) => degrees * (Math.PI / 180);
+    const earthRadiusKm = 6371;
+    const haversine = (lat1, lon1, lat2, lon2) => {
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return earthRadiusKm * c;
+    };
+    let minDistance = Infinity;
+    let closestStation = null;
+    for (const feature of features) {
+      const { geometry, properties, id } = feature;
+      if ((geometry == null ? void 0 : geometry.type) === "Point" && Array.isArray(geometry.coordinates)) {
+        const [lon, lat] = geometry.coordinates;
+        const distance = haversine(options.latitude, options.longitude, lat, lon);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestStation = __spreadProps(__spreadValues({}, properties), { id });
+        }
+      }
+    }
+    if (closestStation) {
+      setSettings({ DeviceID: closestStation.devices[0], StationID: closestStation.id });
+      stopService();
+      setTimeout(() => {
+        startService(bootstrap.settings);
+      }, 1e3);
+    }
+    return closestStation;
+  }
+  return null;
 });
 
 // src/@modules/@utilities/utilities.setListener.ts
@@ -379,6 +581,11 @@ var Manager = class {
     });
   }
 };
+var index_default = Manager;
 export {
-  Manager
+  Manager,
+  index_default as default,
+  getClosestStation,
+  startService,
+  stopService
 };

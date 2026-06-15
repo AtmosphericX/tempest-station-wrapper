@@ -18,8 +18,8 @@
 */
 
 export type TypeSettings = {
-    APIKey: string | null;
-    DeviceID: number | null;
-    StationID: number | null;
-    EnableJournal: boolean;
+    APIKey?: string | null
+    DeviceID?: number | null
+    StationID?: number | null
+    EnableJournal?: boolean
 }

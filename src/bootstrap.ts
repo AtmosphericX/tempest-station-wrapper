@@ -36,7 +36,9 @@ export const bootstrap = {
         longitude: null,
         latitude: null,
         socket: `wss://ws.weatherflow.com/swd/data?api_key={KEY}&location_id={DEVICE}&ver=tempest-20250728`,
-        stations: `https://swd.weatherflow.com/swd/rest/stations/{STATION}?api_key={KEY}`,
+        station: `https://swd.weatherflow.com/swd/rest/stations/{STATION}?api_key={KEY}`,
+        stations: `https://swd.weatherflow.com/swd/rest/map/stations?api_key={KEY}&build=160&limit=500&lat_min={LMIN}&lon_min={LOMIN}&lat_max={LMAX}&lon_max={LOMAX}&_={TIME}`,
+        forecast: `https://swd.weatherflow.com/swd/rest/better_forecast?api_key={KEY}&station_id={STATION}&units_temp=f&units_wind=mph&units_pressure=inhg&units_distance=mi&units_precip=in&units_other=imperial&units_direction=mph`,
         directions: {
             N: [348.75, 360], NNE: [11.25, 33.75], NE: [33.75, 56.25],
             ENE: [56.25, 78.75], E: [78.75, 101.25], ESE: [101.25, 123.75],

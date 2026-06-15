@@ -17,18 +17,14 @@
 
 */
 
-import { bootstrap } from "../../bootstrap"
-import { TypeSettings } from "../../@types/types.settings";
+import { bootstrap } from "../bootstrap";
 
-interface SetWarningOptions { 
-    title?: string
-    message: string
-}
-
-export const setWarning = (options: SetWarningOptions): void => {
-    const settings = bootstrap.settings as TypeSettings;
-    bootstrap.listener.emit(`log`, `${options.title ?? `[${bootstrap.ansi_colors.YELLOW}@atmosx/tempest-station${bootstrap.ansi_colors.RESET}]`} ${options.message}`)
-    if (settings.EnableJournal) { 
-        console.log(`${options.title ?? `[${bootstrap.ansi_colors.YELLOW}@atmosx/tempest-station${bootstrap.ansi_colors.RESET}]`} ${options.message}`)
+export const stopService = async () => {
+    if (bootstrap.socket) {
+        bootstrap.socket.close();
     }
+    bootstrap.socket = null;
+    bootstrap.reconnect = null;
+    bootstrap.connecting = false;
+    bootstrap.reconnect = null;
 }

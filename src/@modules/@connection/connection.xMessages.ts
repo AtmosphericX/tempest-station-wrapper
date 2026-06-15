@@ -17,26 +17,36 @@
 
 */
 
-import { setEventEmit } from "../@utilities/utilities.setEventEmit";
 import { bootstrap } from "../../bootstrap";
+import { wind } from '../../@events/events.wind'
+import { observations } from "../../@events/events.observations";
+import { lightning } from "../../@events/events.lightning";
+import { forecast } from "../../@events/events.forecast"
+import { createHttp } from "../@utilities/utilities.createHttp";
 import ws from 'ws'
 
-
 export const xMessages = async (): Promise<void> => {
-    bootstrap.socket.on('message', (message: ws.Message) => {
+    if (!bootstrap.socket) return;
+    bootstrap.socket.on('message', async (message: ws.Message) => {
         const data = JSON.parse(message.toString());
         switch (data.type) { 
-            case `ack`:
-                console.log(`ACK: ${JSON.stringify(data)}`);
-                break;
             case `obs_st`:
-                console.log(`Observation: ${JSON.stringify(data)}`);
+                observations(data);
+                const response = await createHttp({
+                    url: bootstrap.cache.forecast.replace('{KEY}', bootstrap.settings.APIKey).replace('{STATION}', bootstrap.settings.StationID),
+                    headers: {
+                        "User-Agent": "@atmosx/tempest-station-wrapper",
+                        "Accept": "application/geo+json, text/plain, */*; q=0.9",
+                        "Accept-Language": "en-US,en;q=0.9"
+                    }
+                });
+                if (!response.error) { forecast(JSON.parse(response.message)); }
                 break;
             case `rapid_wind`:
-                console.log(`Rapid Wind: ${JSON.stringify(data)}`);
+                wind(data);
                 break;
             case `evt_strike`:
-                console.log(`Event Strike: ${JSON.stringify(data)}`);
+                lightning(data);
                 break;
             default:
         }

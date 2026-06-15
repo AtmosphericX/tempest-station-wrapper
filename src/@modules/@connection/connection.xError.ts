@@ -17,12 +17,14 @@
 
 */
 
-import { setEventEmit } from "../@utilities/utilities.setEventEmit";
+
 import { bootstrap } from "../../bootstrap";
 import { xReconnect } from "./connection.xReconnect";
+import { setEventEmit } from "../@utilities/utilities.setEventEmit";
 import ws from 'ws'
 
 export const xError = async (): Promise<void> => {
+    if (!bootstrap.socket) return;
     bootstrap.socket.on('error', (error: ws.Error) => {
         setEventEmit({
             event: `onTempestStation`,
@@ -34,7 +36,9 @@ export const xError = async (): Promise<void> => {
             },
             message: `WebSocket closed unexpectedly, Attemtping to reconnect...`
         });
-        bootstrap.socket.close();
+        if (bootstrap.socket) {
+            bootstrap.socket.close();
+        }
         bootstrap.socket = null;
         bootstrap.reconnect = null;
         bootstrap.connecting = false;
