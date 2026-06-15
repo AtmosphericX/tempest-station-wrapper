@@ -1,26 +1,9 @@
 var __create = Object.create;
 var __defProp = Object.defineProperty;
-var __defProps = Object.defineProperties;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getOwnPropSymbols = Object.getOwnPropertySymbols;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __propIsEnum = Object.prototype.propertyIsEnumerable;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __spreadValues = (a, b) => {
-  for (var prop in b || (b = {}))
-    if (__hasOwnProp.call(b, prop))
-      __defNormalProp(a, prop, b[prop]);
-  if (__getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(b)) {
-      if (__propIsEnum.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    }
-  return a;
-};
-var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -66,536 +49,371 @@ var __async = (__this, __arguments, generator) => {
 // src/index.ts
 var index_exports = {};
 __export(index_exports, {
-  TempestStation: () => TempestStation,
-  default: () => index_default
+  Manager: () => Manager
 });
 module.exports = __toCommonJS(index_exports);
 
 // src/bootstrap.ts
-var fs = __toESM(require("fs"));
-var path = __toESM(require("path"));
-var events = __toESM(require("events"));
-var jobs = __toESM(require("croner"));
-var import_ws = __toESM(require("ws"));
-var packages = {
-  fs,
-  path,
-  events,
-  jobs,
-  crypto,
-  ws: import_ws.default
-};
-var cache = {
-  events: new events.EventEmitter(),
-  lastWarn: null,
-  isReady: true
-};
-var settings = {
-  api: null,
-  deviceId: null,
-  stationId: null,
-  journal: true
-};
-var definitions = {
-  messages: {
-    client_stopped: `Disconnected from Tempest Weather Station.`,
-    websocket_closed: `Connection to Tempest Weather Station closed unexpectedly, attempting to reconnect...`,
-    websocket_established: `Successfully connected to Tempest Weather Station.`,
-    forecast_fetch_error: `Please make sure you have a valid station ID`
+var import_node_events = require("events");
+var bootstrap = {
+  version: `2.0.0`,
+  connecting: false,
+  listener: new import_node_events.EventEmitter(),
+  ratelimits: {},
+  reconnect: null,
+  delay: 5e3,
+  socket: null,
+  ansi_colors: {
+    RED: `\x1B[31m`,
+    GREEN: `\x1B[32m`,
+    YELLOW: `\x1B[33m`,
+    BLUE: `\x1B[34m`,
+    MAGENTA: `\x1B[35m`,
+    CYAN: `\x1B[36m`,
+    WHITE: `\x1B[37m`,
+    RESET: `\x1B[0m`
   },
-  cardinal_direction_degrees: {
-    N: [348.75, 360],
-    NNE: [11.25, 33.75],
-    NE: [33.75, 56.25],
-    ENE: [56.25, 78.75],
-    E: [78.75, 101.25],
-    ESE: [101.25, 123.75],
-    SE: [123.75, 146.25],
-    SSE: [146.25, 168.75],
-    S: [168.75, 191.25],
-    SSW: [191.25, 213.75],
-    SW: [213.75, 236.25],
-    WSW: [236.25, 258.75],
-    W: [258.75, 281.25],
-    WNW: [281.25, 303.75],
-    NW: [303.75, 326.25],
-    NNW: [326.25, 348.75]
+  cache: {
+    longitude: null,
+    latitude: null,
+    socket: `wss://ws.weatherflow.com/swd/data?api_key={KEY}&location_id={DEVICE}&ver=tempest-20250728`,
+    stations: `https://swd.weatherflow.com/swd/rest/stations/{STATION}?api_key={KEY}`,
+    directions: {
+      N: [348.75, 360],
+      NNE: [11.25, 33.75],
+      NE: [33.75, 56.25],
+      ENE: [56.25, 78.75],
+      E: [78.75, 101.25],
+      ESE: [101.25, 123.75],
+      SE: [123.75, 146.25],
+      SSE: [146.25, 168.75],
+      S: [168.75, 191.25],
+      SSW: [191.25, 213.75],
+      SW: [213.75, 236.25],
+      WSW: [236.25, 258.75],
+      W: [258.75, 281.25],
+      WNW: [281.25, 303.75],
+      NW: [303.75, 326.25],
+      NNW: [326.25, 348.75]
+    }
+  },
+  settings: {
+    APIKey: null,
+    DeviceID: null,
+    StationID: null,
+    EnableJournal: true
   }
 };
 
-// src/utils.ts
-var Utils = class {
-  /**
-   * @function sleep
-   * @description
-   *     Pauses execution for a specified number of milliseconds.
-   *
-   * @static
-   * @async
-   * @param {number} ms
-   * @returns {Promise<void>}
-   */
-  static sleep(ms) {
-    return __async(this, null, function* () {
-      return new Promise((resolve) => setTimeout(resolve, ms));
+// src/@modules/@utilities/utilities.setTimeoutAction.ts
+var setTimeoutAction = (options) => {
+  var _a, _b;
+  let target = (_b = (_a = bootstrap) == null ? void 0 : _a.ratelimits) == null ? void 0 : _b[options == null ? void 0 : options.identifier];
+  if (!target) {
+    bootstrap.ratelimits[options == null ? void 0 : options.identifier] = [];
+    target = bootstrap.ratelimits[options == null ? void 0 : options.identifier];
+  }
+  if ((target == null ? void 0 : target.length) > 0) {
+    bootstrap.ratelimits[options == null ? void 0 : options.identifier] = target.filter((ts) => Date.now() - ts < (options == null ? void 0 : options.interval) * 1e3);
+    target = bootstrap.ratelimits[options == null ? void 0 : options.identifier];
+  }
+  const oldestTimestamp = target == null ? void 0 : target[0];
+  const getWait = oldestTimestamp ? Math.ceil((options == null ? void 0 : options.interval) * 1e3 - (Date.now() - oldestTimestamp)) : 0;
+  const max = (options == null ? void 0 : options.max) || 1;
+  if ((target == null ? void 0 : target.length) >= max && getWait > 0) {
+    return {
+      limited: true,
+      remaining: getWait,
+      response: `You are being rate limited, please wait ${(getWait / 1e3).toFixed(1)} second(s) before performing this action again.`
+    };
+  }
+  bootstrap.ratelimits[options == null ? void 0 : options.identifier].push(Date.now());
+  return { limited: false };
+};
+
+// src/@modules/@utilities/utilities.setWarning.ts
+var setWarning = (options) => {
+  var _a, _b;
+  const settings = bootstrap.settings;
+  bootstrap.listener.emit(`log`, `${(_a = options.title) != null ? _a : `[${bootstrap.ansi_colors.YELLOW}ATMOSX-PARSER${bootstrap.ansi_colors.RESET}]`} ${options.message}`);
+  if (settings.EnableJournal) {
+    console.log(`${(_b = options.title) != null ? _b : `[${bootstrap.ansi_colors.YELLOW}ATMOSX-PARSER${bootstrap.ansi_colors.RESET}]`} ${options.message}`);
+  }
+};
+
+// src/@modules/@utilities/utilities.setEventEmit.ts
+var setEventEmit = (options) => {
+  if (options.limited) {
+    const isTimeout = setTimeoutAction({ identifier: `event.${options.event}`, addTime: true, max: 1, interval: 1 });
+    if (isTimeout.limited) return;
+  }
+  bootstrap.listener.emit(options.event, options.metadata);
+  if (options.event != `log`) {
+    bootstrap.listener.emit(`*`, { event: options.event, data: options.metadata });
+  }
+  if (options.message) {
+    setWarning({ message: options.message });
+  }
+};
+
+// src/@modules/@utilities/utilities.setSettings.ts
+var setSettings = (newSettings) => {
+  const settings = bootstrap.settings;
+  const merge = (target, source) => {
+    for (const key in source) {
+      if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+      const srcVal = source[key];
+      const tgtVal = target[key];
+      if (srcVal && typeof srcVal === "object" && !Array.isArray(srcVal)) {
+        if (!tgtVal || typeof tgtVal !== "object" || Array.isArray(tgtVal)) {
+          target[key] = {};
+        }
+        merge(target[key], srcVal);
+      } else {
+        target[key] = srcVal;
+      }
+    }
+  };
+  merge(settings, newSettings);
+  return settings;
+};
+
+// src/@modules/@connection/connection.xDeploy.ts
+var import_ws = __toESM(require("ws"));
+
+// src/@modules/@utilities/utilities.createHttp.ts
+var import_request = __toESM(require("request"));
+var createHttp = (options) => __async(null, null, function* () {
+  return new Promise((resolve, reject) => {
+    var _a, _b, _c, _d, _e;
+    const requestOptions = {
+      url: (_a = options.url) != null ? _a : `https://api.weather.gov/alerts/active`,
+      headers: (_b = options.headers) != null ? _b : {
+        "User-Agent": "AtmosphericX",
+        "Accept": "application/geo+json, text/plain, */*; q=0.9",
+        "Accept-Language": "en-US,en;q=0.9"
+      },
+      method: (_c = options.method) != null ? _c : `GET`,
+      timeout: (_d = options.timeout) != null ? _d : 1e4,
+      proxy: (_e = options.proxy) != null ? _e : null,
+      maxRedirects: 1
+    };
+    if (options.formData) {
+      requestOptions["formData"] = options.formData;
+    } else if (options.body) {
+      requestOptions["body"] = options.body;
+    }
+    (0, import_request.default)(requestOptions, (error, response, body) => {
+      var _a2, _b2, _c2, _d2, _e2;
+      if (error) {
+        return resolve({
+          error: true,
+          options: requestOptions,
+          status: -1,
+          message: (_a2 = error.message) != null ? _a2 : `Unknown Error`
+        });
+      }
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return resolve({
+          error: true,
+          options: requestOptions,
+          status: (_b2 = response.statusCode) != null ? _b2 : -1,
+          message: `HTTP Status Code ${(_c2 = response.statusCode) != null ? _c2 : `Unknown Status Code`} (${body})`
+        });
+      }
+      if (body == void 0 || body == null) {
+        return resolve({
+          error: true,
+          options: requestOptions,
+          status: (_d2 = response.statusCode) != null ? _d2 : -1,
+          message: `Empty Response Body`
+        });
+      }
+      resolve({
+        error: false,
+        options: requestOptions,
+        status: (_e2 = response.statusCode) != null ? _e2 : -1,
+        message: body
+      });
     });
+  });
+});
+
+// src/@modules/@connection/connection.xDeploy.ts
+var xDeploy = () => __async(null, null, function* () {
+  const settings = bootstrap.settings;
+  if (!(settings == null ? void 0 : settings.APIKey) || !(settings == null ? void 0 : settings.DeviceID) || (settings == null ? void 0 : settings.DeviceID) == 0 && (settings == null ? void 0 : settings.StationID) == 0) {
+    setEventEmit({
+      event: `onTempestStation`,
+      metadata: {
+        message: `Invalid settings provided, please make sure you have provided valid APIKey, DeviceID, and StationID.`,
+        data: {},
+        type: `error`,
+        error: true
+      },
+      message: `Invalid settings provided, please make sure you have provided valid APIKey, DeviceID, and StationID.`
+    });
+    return;
   }
-  /**
-  * @function warn
-  * @description
-  *     Emits a log event and prints a warning to the console. Throttles repeated
-  *     warnings within a short interval unless `force` is `true`.
-  *
-  * @static
-  * @param {string} message
-  * @param {boolean} [force=false]
-  */
-  static warn(message, force = false) {
-    cache.events.emit("log", message);
-    if (!settings.journal) return;
-    if (cache.lastWarn != null && Date.now() - cache.lastWarn < 500 && !force) return;
-    cache.lastWarn = Date.now();
-    console.warn(`\x1B[33m[ATMOSX-TEMPEST]\x1B[0m [${(/* @__PURE__ */ new Date()).toLocaleString()}] ${message}`);
-  }
-  /**
-   * @function createHttpRequest
-   * @description
-   *     Performs an HTTP GET request with default headers and timeout, returning
-   *     either the response data or an error message.
-   *
-   * @static
-   * @template T
-   * @param {string} url
-   * @param {types.HTTPSettings} [options]
-   * @returns {Promise<{ error: boolean; message: T | string }>}
-   */
-  static createHttpRequest(url, options) {
-    return __async(this, null, function* () {
-      var _a;
-      const defaultOptions = {
-        timeout: 1e4,
+  bootstrap.socket = new import_ws.default(bootstrap.cache.socket.replace("{KEY}", settings.APIKey).replace("{DEVICE}", settings.DeviceID.toString()));
+  bootstrap.socket.on("open", () => __async(null, null, function* () {
+    var _a;
+    setEventEmit({
+      event: `onTempestStation`,
+      metadata: {
+        message: `WebSocket connection established.`,
+        data: {},
+        type: `online`,
+        error: false
+      },
+      message: `WebSocket connection established.`
+    });
+    if (settings == null ? void 0 : settings.StationID) {
+      const station = yield createHttp({
+        url: bootstrap.cache.stations.replace("{STATION}", String(settings.StationID)).replace("{KEY}", settings.APIKey),
         headers: {
-          "User-Agent": "AtmosphericX",
+          "User-Agent": "@atmosx/tempest-station-wrapper",
           "Accept": "application/geo+json, text/plain, */*; q=0.9",
           "Accept-Language": "en-US,en;q=0.9"
         }
-      };
-      const requestOptions = __spreadProps(__spreadValues(__spreadValues({}, defaultOptions), options), {
-        headers: __spreadValues(__spreadValues({}, defaultOptions.headers), (_a = options == null ? void 0 : options.headers) != null ? _a : {})
       });
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), requestOptions.timeout);
-        const resp = yield fetch(url, {
-          headers: requestOptions.headers,
-          signal: controller.signal,
-          redirect: "manual"
-        });
-        clearTimeout(timeoutId);
-        if (resp.status !== 200 && resp.status !== 500) {
-          throw new Error(`HTTP Error: ${resp.status}`);
-        }
-        const data = yield resp.json();
-        return { error: false, message: data };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { error: true, message: msg };
+      if (!station.error) {
+        const data = station.message;
+        const s1 = (_a = data.stations) == null ? void 0 : _a[0];
+        bootstrap.cache.longitude = Number(s1 == null ? void 0 : s1.longitude);
+        bootstrap.cache.latitude = Number(s1 == null ? void 0 : s1.latitude);
       }
-    });
-  }
-  /**
-   * @function mergeClientSettings
-   * @description
-   *     Recursively merges a ClientSettings object into a target object,
-   *     preserving nested structures and overriding existing values.
-   *
-   * @static
-   * @param {Record<string, unknown>} target
-   * @param {types.ClientSettingsTypes} settings
-   * @returns {Record<string, unknown>}
-   */
-  static mergeClientSettings(target, settings2) {
-    for (const key in settings2) {
-      if (!Object.prototype.hasOwnProperty.call(settings2, key)) continue;
-      const value = settings2[key];
-      if (value && typeof value === "object" && !Array.isArray(value)) {
-        if (!target[key] || typeof target[key] !== "object" || Array.isArray(target[key])) {
-          target[key] = {};
+      if (bootstrap.socket) {
+        if (Number.isFinite(bootstrap.cache.longitude) && Number.isFinite(bootstrap.cache.latitude)) {
+          bootstrap.socket.send(JSON.stringify({
+            type: "geo_strike_listen_start",
+            lat_min: bootstrap.cache.latitude - 5,
+            lat_max: bootstrap.cache.latitude + 5,
+            lon_min: bootstrap.cache.longitude - 5,
+            lon_max: bootstrap.cache.longitude + 5
+          }));
         }
-        this.mergeClientSettings(target[key], value);
-      } else {
-        target[key] = value;
+        bootstrap.socket.send(JSON.stringify({
+          type: "listen_start",
+          device_id: settings.DeviceID
+        }));
+        bootstrap.socket.send(JSON.stringify({
+          type: "listen_rapid_start",
+          device_id: settings.DeviceID
+        }));
       }
     }
-    return target;
-  }
-};
-var utils_default = Utils;
+  }));
+});
 
-// src/handler.ts
-var Handler = class {
-  /**
-   * @function observationHandler
-   * @description
-   *    Handles incoming observation data and emits an 'onObservation' event with formatted data.
-   *
-   * @public
-   * @static
-   * @param {*} data 
-   */
-  static observationHandler(data) {
-    cache.events.emit(`onObservation`, {
-      features: [{
-        geometry: { type: "Point", coordinates: [] },
-        type: "Feature",
-        properties: {
-          pressure_trend: data.summary.pressure_trend,
-          latest: {
-            epoch_latest_lightning: data.summary.strike_last_epoch,
-            latest_lightning_distance: data.summary.strike_last_dist,
-            precipitation_time: data.summary.precip_minutes_local_day_final
-          },
-          observation: {
-            time: data.obs[0][0],
-            wind_average: parseFloat((data.obs[0][2] * 2.23694).toFixed(2)),
-            wind_gust: parseFloat((data.obs[0][3] * 2.23694).toFixed(2)),
-            wind_direction: definitions.cardinal_direction_degrees ? Object.keys(definitions.cardinal_direction_degrees).find((dir) => {
-              const [min, max] = definitions.cardinal_direction_degrees[dir];
-              return data.obs[0][4] >= min && data.obs[0][4] < max;
-            }) : data.obs[0][4],
-            temperature: parseFloat((data.obs[0][7] * 9 / 5 + 32).toFixed(2)),
-            humidity: data.obs[0][8]
-          }
-        }
-      }]
-    });
+// src/@modules/@connection/connection.xReconnect.ts
+var xReconnect = (reason) => {
+  if (bootstrap.reconnect) return;
+  if (String(reason).includes(`429`)) {
+    bootstrap.delay = Math.min(bootstrap.delay * 2, 6e4);
   }
-  /**
-   * @function forecastHandler
-   * @description
-   *    Handles incoming forecast data and emits an 'onForecast' event with formatted data.
-   * 
-   * @public
-   * @static
-   * @param {*} data
-   */
-  static forecastHandler(data) {
-    if (data.error || data.message.status.status_code == 3) {
-      return utils_default.warn(definitions.messages.forecast_fetch_error, true);
-    }
-    cache.events.emit(`onForecast`, {
-      features: [{
-        geometry: { type: "Point", coordinates: [data.message.latitude, data.message.longitude] },
-        type: "Feature",
-        properties: {
-          feels_like: data.message.current_conditions.feels_like,
-          temperature: data.message.current_conditions.air_temperature,
-          densitity: data.message.current_conditions.air_density,
-          conditions: data.message.current_conditions.conditions,
-          dew_point: data.message.current_conditions.dew_point,
-          humidity: data.message.current_conditions.relative_humidity,
-          pressure_trend: data.message.current_conditions.pressure_trend,
-          wind_average: data.message.current_conditions.wind_avg,
-          wind_gust: data.message.current_conditions.wind_gust,
-          wind_direction: definitions.cardinal_direction_degrees ? Object.keys(definitions.cardinal_direction_degrees).find((dir) => {
-            const [min, max] = definitions.cardinal_direction_degrees[dir];
-            return data.message.current_conditions.wind_direction >= min && data.message.current_conditions.wind_direction < max;
-          }) : data.message.current_conditions.wind_direction,
-          station_name: data.message.location_name,
-          elevation: data.message.elevation
-        }
-      }]
-    });
-  }
-  /**
-   * @function rapidWindHandler
-   * @description
-   *    Handles incoming rapid wind data and emits an 'onRapidWind' event with formatted data.
-   * 
-   * @public
-   * @static
-   * @param {*} data
-   */
-  static rapidWindHandler(data) {
-    cache.events.emit(`onRapidWind`, {
-      features: [{
-        geometry: { type: "Point", coordinates: [] },
-        type: "Feature",
-        properties: {
-          time: data.ob[0],
-          speed: data.ob[1],
-          direction: definitions.cardinal_direction_degrees ? Object.keys(definitions.cardinal_direction_degrees).find((dir) => {
-            const [min, max] = definitions.cardinal_direction_degrees[dir];
-            return data.ob[2] >= min && data.ob[2] < max;
-          }) : data.ob[2]
-        }
-      }]
-    });
-  }
-  /**
-   * @function lightningHandler
-   * @description
-   *   Handles incoming lightning event data and emits an 'onLightning' event with formatted data.
-   * 
-   * @public
-   * @static
-   * @param {*} data
-   */
-  static lightningHandler(data) {
-    cache.events.emit(`onLightning`, {
-      features: [{
-        geometry: { type: "Point", coordinates: [] },
-        type: "Feature",
-        properties: {
-          time: data.evt[0],
-          distance: parseFloat((data.evt[1] / 0.621371).toFixed(2)),
-          energy: data.evt[2]
-        }
-      }]
-    });
-  }
+  bootstrap.reconnect = setTimeout(() => __async(null, null, function* () {
+    bootstrap.reconnect = null;
+    yield xDeploy();
+  }), bootstrap.delay);
 };
-var handler_default = Handler;
+
+// src/@modules/@connection/connection.xError.ts
+var xError = () => __async(null, null, function* () {
+  bootstrap.socket.on("error", (error) => {
+    setEventEmit({
+      event: `onTempestStation`,
+      metadata: {
+        message: `WebSocket connection error.`,
+        data: {},
+        type: `error`,
+        error: true
+      },
+      message: `WebSocket closed unexpectedly, Attemtping to reconnect...`
+    });
+    bootstrap.socket.close();
+    bootstrap.socket = null;
+    bootstrap.reconnect = null;
+    bootstrap.connecting = false;
+    return xReconnect(error);
+  });
+});
+
+// src/@modules/@connection/connection.xMessages.ts
+var xMessages = () => __async(null, null, function* () {
+  bootstrap.socket.on("message", (message) => {
+    const data = JSON.parse(message.toString());
+    switch (data.type) {
+      case `ack`:
+        console.log(`ACK: ${JSON.stringify(data)}`);
+        break;
+      case `obs_st`:
+        console.log(`Observation: ${JSON.stringify(data)}`);
+        break;
+      case `rapid_wind`:
+        console.log(`Rapid Wind: ${JSON.stringify(data)}`);
+        break;
+      case `evt_strike`:
+        console.log(`Event Strike: ${JSON.stringify(data)}`);
+        break;
+      default:
+    }
+  });
+});
+
+// src/@core/core.start.ts
+var startService = (configurations) => __async(null, null, function* () {
+  if (bootstrap.connecting) return;
+  bootstrap.connecting = true;
+  setSettings(configurations);
+  yield xDeploy();
+  yield xError();
+  yield xMessages();
+});
+
+// src/@modules/@utilities/utilities.setListener.ts
+var setListener = (options) => {
+  bootstrap.listener.on(options.event, options.callback);
+  return () => {
+    void bootstrap.listener.off(options.event, options.callback);
+  };
+};
+
+// src/@core/core.createListener.ts
+var createListener = (event, callback) => {
+  setListener({ event, callback });
+};
 
 // src/index.ts
-var TempestStation = class {
-  constructor(metadata) {
-    this.latitude = 0;
-    this.longitude = 0;
-    this.websocket = null;
-    this.isConnecting = false;
-    this.reconnectTimer = null;
-    this.reconnectDelay = 5e3;
-    this.start(metadata);
+var Manager = class {
+  constructor(settings) {
+    this.trycatch();
+    startService(settings);
   }
-  /**
-   * @private
-   * @function scheduleReconnect
-   * @description
-   *     Schedules a reconnection attempt after a specified delay.
-   *
-   * @param {any} [reason]
-   */
-  scheduleReconnect(reason) {
-    var _a;
-    if (this.reconnectTimer) return;
-    if ((_a = String(reason)) == null ? void 0 : _a.includes("429")) {
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, 6e4);
-    }
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      this.start(settings);
-    }, this.reconnectDelay);
-  }
-  /**
-   * @function setSettings
-   * @description
-   *     Merges the provided client settings into the current configuration,
-   *     preserving nested structures.
-   *
-   * @async
-   * @param {types.ClientSettingsTypes} settings
-   * @returns {Promise<void>}
-   */
-  setSettings(settings2) {
-    return __async(this, null, function* () {
-      if (settings2.deviceId == settings.deviceId && settings2.stationId == settings.stationId) return;
-      this.stop();
-      this.start(settings2);
-    });
-  }
-  /**
-   * @function on
-   * @description
-   *     Registers a callback for a specific event and returns a function
-   *     to unregister the listener.
-   *
-   * @param {string} event
-   * @param {(...args: any[]) => void} callback
-   * @returns {() => void}
-   */
   on(event, callback) {
-    cache.events.on(event, callback);
-    return () => cache.events.off(event, callback);
+    createListener(event, callback);
   }
-  /**
-   * @function start
-   * @description
-   *     Initializes the client with the provided settings
-   *
-   * @async
-   * @param {types.ClientSettingsTypes} metadata
-   * @returns {Promise<void>}
-   */
-  start(metadata) {
-    return __async(this, null, function* () {
-      try {
-        if (this.isConnecting) return;
-        this.isConnecting = true;
-        utils_default.mergeClientSettings(settings, metadata);
-        const settings2 = settings;
-        if (!(settings2 == null ? void 0 : settings2.api) || !(settings2 == null ? void 0 : settings2.deviceId) || (settings2 == null ? void 0 : settings2.stationId) == 0 && (settings2 == null ? void 0 : settings2.deviceId) == 0) {
-          return utils_default.warn(`${definitions.messages.websocket_closed}`, true);
-        }
-        const wsUrl = `wss://ws.weatherflow.com/swd/data?api_key=${settings2.api}&location_id=${settings2.deviceId}&ver=tempest-20250728`;
-        this.websocket = new packages.ws(wsUrl);
-        this.websocket.on("error", (error) => {
-          this.stop();
-          utils_default.warn(`${definitions.messages.websocket_closed} (${error})`, true);
-          this.scheduleReconnect(error);
-          return;
-        });
-        this.websocket.on("open", () => __async(this, null, function* () {
-          utils_default.warn(`${definitions.messages.websocket_established} @ ${settings2.deviceId}/${settings2.stationId}`, true);
-          cache.events.emit(`onConnection`);
-          if (settings2.stationId) {
-            const stationsUrl = `https://swd.weatherflow.com/swd/rest/stations/${settings2.stationId}?api_key=${settings2.api}`;
-            const responseStations = yield utils_default.createHttpRequest(stationsUrl);
-            if (!responseStations.error) {
-              const station = responseStations.message;
-              if (station && typeof station === "object" && Array.isArray(station.stations) && station.stations[0]) {
-                const s = station.stations[0];
-                this.latitude = Number(s.latitude);
-                this.longitude = Number(s.longitude);
-              }
-            }
-            if (this.websocket) {
-              if (Number.isFinite(this.latitude) && Number.isFinite(this.longitude)) {
-                this.websocket.send(JSON.stringify({
-                  type: "geo_strike_listen_start",
-                  lat_min: this.latitude - 5,
-                  lat_max: this.latitude + 5,
-                  lon_min: this.longitude - 5,
-                  lon_max: this.longitude + 5
-                }));
-              }
-              this.websocket.send(JSON.stringify({
-                type: "listen_start",
-                device_id: settings2.deviceId
-              }));
-              this.websocket.send(JSON.stringify({
-                type: "listen_rapid_start",
-                device_id: settings2.deviceId
-              }));
-            }
-          }
-        }));
-        this.websocket.on("message", (response) => __async(this, null, function* () {
-          let data;
-          try {
-            data = JSON.parse(response);
-          } catch (e) {
-            return;
-          }
-          const type = (data == null ? void 0 : data.type) || null;
-          if (type == `ack`) cache.events.emit(`onAcknowledge`, data);
-          if (type == `obs_st`) {
-            handler_default.observationHandler(data);
-            handler_default.forecastHandler(yield this.getForecast());
-          }
-          if (type == `rapid_wind`) handler_default.rapidWindHandler(data);
-          if (type == `evt_strike`) handler_default.lightningHandler(data);
-        }));
-        handler_default.forecastHandler(yield this.getForecast());
-      } catch (error) {
-        utils_default.warn(`An error occurred while starting the TempestStation client: ${error}`, true);
-        this.stop();
-        setTimeout(() => {
-          this.start(settings);
-        }, 1e3);
-      }
-    });
-  }
-  /**
-   * @function getForecast
-   * @description
-   *     Fetches the weather forecast data from the TempestStation API.
-   * 
-   * @async
-   * @returns {Promise<{ error: boolean; message: any | string }>}
-   */
-  getForecast() {
-    return __async(this, null, function* () {
-      const settings2 = settings;
-      const forecastUrl = `https://swd.weatherflow.com/swd/rest/better_forecast?api_key=${settings2.api}&station_id=${settings2.stationId}&units_temp=f&units_wind=mph&units_pressure=inhg&units_distance=mi&units_precip=in&units_other=imperial&units_direction=mph`;
-      return yield utils_default.createHttpRequest(forecastUrl);
-    });
-  }
-  /**
-   * @function getClosestStation
-   * @description
-   *    Fetches the closest weather station based on provided coordinates.
-   * 
-   * @public
-   * @async
-   * @param {types.Coordinates} coordinates 
-   * @returns {unknown} 
-   */
-  getClosestStation(coordinates) {
-    return __async(this, null, function* () {
+  trycatch() {
+    process.on("uncaughtException", (err) => {
       var _a;
-      if (!coordinates || typeof coordinates.lat !== "number" || typeof coordinates.lon !== "number") return null;
-      const latMin = coordinates.lat - 5, latMax = coordinates.lat + 5;
-      const lonMin = coordinates.lon - 5, lonMax = coordinates.lon + 5;
-      const settings2 = settings;
-      if (!(settings2 == null ? void 0 : settings2.api)) return null;
-      const stationsUrl = `https://swd.weatherflow.com/swd/rest/map/stations?api_key=${settings2.api}&build=160&limit=500&lat_min=${latMin}&lon_min=${lonMin}&lat_max=${latMax}&lon_max=${lonMax}&_=${Date.now()}`;
-      const responseStations = yield utils_default.createHttpRequest(stationsUrl);
-      if (responseStations.error) return null;
-      const data = responseStations.message;
-      const features = Array.isArray(data == null ? void 0 : data.features) ? data.features : [];
-      if (!features.length) return null;
-      const refLat = coordinates.lat;
-      const refLon = coordinates.lon;
-      const toRad = (deg) => deg * Math.PI / 180;
-      const earthRadiusKm = 6371;
-      const haversine = (lat1, lon1, lat2, lon2) => {
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return earthRadiusKm * c;
-      };
-      let minDistance = Infinity;
-      let bestStation = null;
-      for (const feature of features) {
-        const coords = (_a = feature == null ? void 0 : feature.geometry) == null ? void 0 : _a.coordinates;
-        if (!Array.isArray(coords) || coords.length < 2) continue;
-        const [lon, lat] = coords.map(Number);
-        if (Number.isNaN(lat) || Number.isNaN(lon)) continue;
-        const d = haversine(refLat, refLon, lat, lon);
-        if (d < minDistance) {
-          minDistance = d;
-          bestStation = feature;
-        }
+      const ignored = ["ETIMEDOUT", "ECONNRESET", "EHOSTUNREACH", "ENOTFOUND", "ECONNREFUSED", "EPIPE", "EADDRINUSE", "EALREADY", "EACCES", "EAGAIN", "EHOSTDOWN", "STARTTLS_FAILURE"];
+      if (ignored.includes(err == null ? void 0 : err.code)) {
+        setEventEmit({
+          event: `onTempestStation`,
+          metadata: {
+            message: `Tempest Critical Error: ${(_a = err == null ? void 0 : err.code) != null ? _a : "Unknown error code"}. This may indicate a connection issue.`,
+            data: {},
+            type: `error`,
+            error: true
+          }
+        });
+        return;
       }
-      if (!bestStation || !isFinite(minDistance)) return null;
-      return bestStation;
-    });
-  }
-  /**
-   * @function stop
-   * @description
-   *     Stops active connections and cleans up resources.
-   *
-   * @async
-   * @returns {Promise<void>}
-   */
-  stop() {
-    return __async(this, null, function* () {
-      var _a, _b;
-      if (this.websocket) {
-        (_b = (_a = this.websocket).removeAllListeners) == null ? void 0 : _b.call(_a);
-        this.websocket.close();
-        this.websocket = null;
-      }
-      this.isConnecting = false;
-      utils_default.warn(`${definitions.messages.client_stopped} @ ${settings.deviceId}/${settings.stationId}`, true);
+      setWarning({ message: `Uncaught Exception: ${err instanceof Error ? err.stack || err.message : String(err)}` });
     });
   }
 };
-var index_default = TempestStation;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  TempestStation
+  Manager
 });

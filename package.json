@@ -11,9 +11,10 @@
 	},
 	"scripts": {
 		"start": "cd ./test && node ./index.js",
-    	"build": "tsup && cd ./test && node ./index.js",
+		"build": "tsup && cd ./test && node ./index.js",
+		"heap-memory-errors": "node --heap-prof --heap-prof-name=heap-profile-%p.heapsnapshot ./test/index.js",
 		"publish": "tsup && npm publish --access public",
-		"publish-beta": "tsup && npm publish --tag beta --access public"
+		"publish-beta-branch": "tsup && npm publish --tag v2-beta-branch --access public"
 	},
 	"keywords": [
 		"Tempest Weather Station",
@@ -31,10 +32,9 @@
 	},
 	"homepage": "https://github.com/AtmosphericX/tempest-station-wrapper#readme",
 	"dependencies": {
-		"croner": "9.1.0",
 		"typescript": "5.9.3",
-		"crypto-js": "4.2.0",
-		"ws": "8.19.0"
+		"ws": "8.19.0",
+		"request": "2.88.2"
 	},
 	"devDependencies": {
 		"@types/node": "25.2.0",
