@@ -46,7 +46,7 @@ export const wind = (data: WindOptions): void => {
                 direction: bootstrap.cache.directions ? Object.keys(bootstrap.cache.directions).find(key => {
                     const [min, max] = bootstrap.cache.directions[key as keyof typeof bootstrap.cache.directions];
                     return min <= data.ob?.[2] && data.ob?.[2] < max;
-                }) : undefined
+                }) : `N`,
             }
         },
     });

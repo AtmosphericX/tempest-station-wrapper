@@ -401,7 +401,7 @@ var wind = (data) => {
           var _a2, _b2;
           const [min, max] = bootstrap.cache.directions[key];
           return min <= ((_a2 = data.ob) == null ? void 0 : _a2[2]) && ((_b2 = data.ob) == null ? void 0 : _b2[2]) < max;
-        }) : void 0
+        }) : `N`
       }
     }
   });
@@ -425,7 +425,7 @@ var observations = (data) => {
           direction: bootstrap.cache.directions ? Object.keys(bootstrap.cache.directions).find((dir) => {
             const [min, max] = bootstrap.cache.directions[dir];
             return data.obs[0][4] >= min && data.obs[0][4] < max;
-          }) : data.obs[0][4],
+          }) : `N`,
           temperature: parseFloat((data.obs[0][7] * 9 / 5 + 32).toFixed(2)),
           humidity: data.obs[0][8]
         }

@@ -69,7 +69,7 @@ export const observations = (data: ObservationsOptions): void => {
                     direction: bootstrap.cache.directions ? Object.keys(bootstrap.cache.directions).find(dir => {
                         const [min, max] = bootstrap.cache.directions[dir as keyof typeof bootstrap.cache.directions];
                         return data.obs[0][4] >= min && data.obs[0][4] < max;
-                    }) : data.obs[0][4],
+                    }) : `N`,
                     temperature: parseFloat(((data.obs[0][7] * 9/5) + 32).toFixed(2)),
                     humidity: data.obs[0][8],
                 }
