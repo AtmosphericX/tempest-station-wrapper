@@ -77,7 +77,7 @@ module.exports = __toCommonJS(index_exports);
 // src/bootstrap.ts
 var import_node_events = require("events");
 var bootstrap = {
-  version: `2.0.0`,
+  version: `2.0.01`,
   connecting: false,
   listener: new import_node_events.EventEmitter(),
   ratelimits: {},
@@ -529,7 +529,6 @@ var getClosestStation = (options) => __async(null, null, function* () {
   if (!Number.isFinite(options.latitude) || !Number.isFinite(options.longitude)) {
     setWarning({ message: `Invalid latitude or longitude provided.` });
   }
-  console.log(bootstrap.cache.stations.replace("{KEY}", bootstrap.settings.APIKey).replace("{LMIN}", String(options.latitude - 5)).replace("{LOMIN}", String(options.longitude - 5)).replace("{LMAX}", String(options.latitude + 5)).replace("{LOMAX}", String(options.longitude + 5)).replace("{TIME}", String(Date.now())));
   const response = yield createHttp({
     url: bootstrap.cache.stations.replace("{KEY}", bootstrap.settings.APIKey).replace("{LMIN}", String(options.latitude - 5)).replace("{LOMIN}", String(options.longitude - 5)).replace("{LMAX}", String(options.latitude + 5)).replace("{LOMAX}", String(options.longitude + 5)).replace("{TIME}", String(Date.now())),
     headers: {

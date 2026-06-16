@@ -33,13 +33,6 @@ export const getClosestStation = async (options: GetClosestStationOptions) => {
     if (!Number.isFinite(options.latitude) || !Number.isFinite(options.longitude)) {
         setWarning({ message: `Invalid latitude or longitude provided.` });
     }
-    console.log( bootstrap.cache.stations
-            .replace('{KEY}', bootstrap.settings.APIKey)
-            .replace('{LMIN}', String(options.latitude - 5))
-            .replace('{LOMIN}', String(options.longitude - 5))
-            .replace('{LMAX}', String(options.latitude + 5))
-            .replace('{LOMAX}', String(options.longitude + 5))
-            .replace('{TIME}', String(Date.now())))
     const response = await createHttp({
         url: bootstrap.cache.stations
             .replace('{KEY}', bootstrap.settings.APIKey)
