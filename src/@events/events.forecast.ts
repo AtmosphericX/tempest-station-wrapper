@@ -110,8 +110,6 @@ interface ForecastOptions {
     }
 }
 
-   
-
 export const forecast = (data: ForecastOptions): void => {
     setEventEmit({
         event: `onForecast`,

@@ -20,8 +20,6 @@
 import { setEventEmit } from '../@modules/@utilities/utilities.setEventEmit'
 import { bootstrap } from '../bootstrap';
 
-
-
 interface LightningOptions {
     serial_number: string
     type: string

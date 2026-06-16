@@ -20,7 +20,7 @@
 import { EventEmitter } from 'node:events';
 
 export const bootstrap = {
-    version: `2.0.0`,
+    version: `2.0.01`,
     connecting: false,
     listener: new EventEmitter(),
     ratelimits: {},

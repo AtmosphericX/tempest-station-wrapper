@@ -48,10 +48,7 @@ interface ObservationsOptions {
         precip_minutes_local_day: number
         precip_minutes_local_yesterday: number
     }
-    obs: [
-        number[]
-    ]
-
+    obs: [number[]]
 }
 
 export const observations = (data: ObservationsOptions): void => {
