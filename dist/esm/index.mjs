@@ -41,7 +41,7 @@ var __async = (__this, __arguments, generator) => {
 // src/bootstrap.ts
 import { EventEmitter } from "events";
 var bootstrap = {
-  version: `2.0.01`,
+  version: `2.0.02`,
   connecting: false,
   listener: new EventEmitter(),
   ratelimits: {},
@@ -166,61 +166,39 @@ var setSettings = (newSettings) => {
 };
 
 // src/@modules/@utilities/utilities.createHttp.ts
-import request from "request";
 var createHttp = (options) => __async(null, null, function* () {
-  return new Promise((resolve, reject) => {
-    var _a, _b, _c, _d, _e;
-    const requestOptions = {
-      url: (_a = options.url) != null ? _a : `https://api.weather.gov/alerts/active`,
-      headers: (_b = options.headers) != null ? _b : {
-        "User-Agent": "AtmosphericX",
-        "Accept": "application/geo+json, text/plain, */*; q=0.9",
-        "Accept-Language": "en-US,en;q=0.9"
-      },
-      method: (_c = options.method) != null ? _c : `GET`,
-      timeout: (_d = options.timeout) != null ? _d : 1e4,
-      proxy: (_e = options.proxy) != null ? _e : null,
-      maxRedirects: 1
-    };
-    if (options.formData) {
-      requestOptions["formData"] = options.formData;
-    } else if (options.body) {
-      requestOptions["body"] = options.body;
+  var _a, _b, _c, _d;
+  const requestOptions = {
+    method: (_a = options.method) != null ? _a : "GET",
+    headers: (_b = options.headers) != null ? _b : {
+      "User-Agent": "AtmosphericX",
+      "Accept": "application/geo+json, text/plain, */*; q=0.9",
+      "Accept-Language": "en-US,en;q=0.9"
+    },
+    signal: AbortSignal.timeout((_c = options.timeout) != null ? _c : 1e4),
+    redirect: "follow"
+  };
+  const returnHttp = function(error, status, message) {
+    return { error, options: requestOptions, status, message };
+  };
+  if (options == null ? void 0 : options.formData) {
+    requestOptions.body = options.formData;
+  } else if ((options == null ? void 0 : options.body) != void 0) {
+    requestOptions.body = options.body instanceof FormData ? options.body : typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+  }
+  try {
+    const response = yield fetch(
+      (_d = options == null ? void 0 : options.url) != null ? _d : `https://api.weather.gov/alerts/active`,
+      requestOptions
+    );
+    const body = yield response.text();
+    if (!response.ok) {
+      return returnHttp(true, response.status, `HTTP Status Code ${response.status} (${response.statusText})`);
     }
-    request(requestOptions, (error, response, body) => {
-      var _a2, _b2, _c2, _d2, _e2;
-      if (error) {
-        return resolve({
-          error: true,
-          options: requestOptions,
-          status: -1,
-          message: (_a2 = error.message) != null ? _a2 : `Unknown Error`
-        });
-      }
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        return resolve({
-          error: true,
-          options: requestOptions,
-          status: (_b2 = response.statusCode) != null ? _b2 : -1,
-          message: `HTTP Status Code ${(_c2 = response.statusCode) != null ? _c2 : `Unknown Status Code`} (${body})`
-        });
-      }
-      if (body == void 0 || body == null) {
-        return resolve({
-          error: true,
-          options: requestOptions,
-          status: (_d2 = response.statusCode) != null ? _d2 : -1,
-          message: `Empty Response Body`
-        });
-      }
-      resolve({
-        error: false,
-        options: requestOptions,
-        status: (_e2 = response.statusCode) != null ? _e2 : -1,
-        message: body
-      });
-    });
-  });
+    return returnHttp(false, response.status, body);
+  } catch (error) {
+    return returnHttp(true, 500, `Internal Server Error: ${error}`);
+  }
 });
 
 // src/@modules/@connection/connection.xReconnect.ts
