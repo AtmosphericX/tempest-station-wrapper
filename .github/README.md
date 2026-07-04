@@ -215,10 +215,10 @@ const closestStation = getClosestStation([longitude, latitude]);
 [Documentation](https://atmosphericx.scriptkitty.cafe/documentation) |
 [Discord Server](https://atmosphericx-discord.scriptkitty.cafe) |
 [Project Board](https://github.com/users/AtmosphericX/projects/2) |\
-[Code of Conduct](/CODE_OF_CONDUCT.md) |
-[Contributing](/CONTRIBUTING.md) |
-[License](/LICENSE) | 
-[Security](/SECURITY.md) | 
+[Code of Conduct](/.github/CODE_OF_CONDUCT.md) |
+[Contributing](/.github/CONTRIBUTING.md) |
+[License](/.github/LICENSE) | 
+[Security](/.github/SECURITY.md) | 
 
 ## Acknowledgements
 - [k3yomi](https://github.com/k3yomi)
